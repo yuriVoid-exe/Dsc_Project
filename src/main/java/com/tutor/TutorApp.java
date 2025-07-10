@@ -1,6 +1,7 @@
 package com.tutor;
 
 import com.tutor.config.ModelConfig;
+import com.tutor.prompt.PromptTemplates;
 import dev.langchain4j.chain.ConversationalChain;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
@@ -22,6 +23,9 @@ public class TutorApp {
         // Define a mémoria de curto prazo do chat
         var memory = MessageWindowChatMemory.withMaxMessages(20);
 
+        // Define o prompt com o perfil do aluno (iniciante, intermediario, avançado)
+        memory.add(PromptTemplates.tutorPromptBeginner());
+
         // Cria a cadeia de conversação com o modelo e a memória
         var chain = ConversationalChain.builder()
                 .chatLanguageModel(model)
@@ -29,7 +33,7 @@ public class TutorApp {
                 .build();
 
         // Mensagem inicial
-        System.out.println("Tutor de Inglês - powered by LLaMA 3.2 via Ollama");
+        System.out.println("Tutor de Inglês-para Brasileiros");
         System.out.println("Digite 'sair' para encerrar.\n");
 
         // Leitura do usuário
