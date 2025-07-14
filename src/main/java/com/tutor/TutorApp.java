@@ -2,6 +2,8 @@ package com.tutor;
 
 import com.tutor.config.ModelConfig;
 import com.tutor.prompt.PromptTemplates;
+import com.tutor.config.EmbeddingConfig;
+import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.chain.ConversationalChain;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
@@ -31,6 +33,23 @@ public class TutorApp {
                 .chatLanguageModel(model)
                 .chatMemory(memory)
                 .build();
+        // Dentro do main() em TutorApp.java
+
+        System.out.println("\n--- Testando o Modelo de Embedding ---");
+        try {
+            EmbeddingModel embeddingModel = EmbeddingConfig.createEmbeddingModel();
+
+            // Cria um embedding para uma frase
+            float[] vector = embeddingModel.embed("Hello, how are you?").content().vector();
+
+            System.out.println("Vetor de embedding gerado com sucesso!");
+            System.out.println("Dimensão do vetor: " + vector.length); // Deve imprimir 384
+            // System.out.println("Exemplo de vetor: " + java.util.Arrays.toString(java.util.Arrays.copyOf(vector, 5))); // Mostra os 5 primeiros valores
+
+        } catch (Exception e) {
+            System.err.println("Ocorreu um erro ao inicializar o modelo de embedding:");
+            e.printStackTrace();
+        }
 
         // Mensagem inicial
         System.out.println("Tutor de Inglês-para Brasileiros");
