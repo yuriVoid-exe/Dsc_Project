@@ -13,6 +13,7 @@
         <maven.compiler.target>21</maven.compiler.target>
         <langchain4j.version>0.32.0</langchain4j.version>
         <onnxruntime.version>1.18.0</onnxruntime.version>
+        <pdfbox.version>2.0.31</pdfbox.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     </properties>
 
@@ -48,6 +49,18 @@
             <groupId>dev.langchain4j</groupId>
             <artifactId>langchain4j-embeddings-all-minilm-l6-v2-q</artifactId>
             <version>${langchain4j.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-document-parser-apache-pdfbox</artifactId>
+            <version>${langchain4j.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox</artifactId>
+            <version>${pdfbox.version}</version>
         </dependency>
 
         <dependency>
