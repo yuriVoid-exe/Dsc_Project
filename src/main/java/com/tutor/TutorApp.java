@@ -18,7 +18,7 @@ public class TutorApp {
     public static void main(String[] args) {
 
         // Recupera o modelo de linguagem configurado
-        ChatLanguageModel model = ModelConfig.getModel();
+        ChatLanguageModel model = ModelConfig.createChatLanguageModel();
 
         // Define a mémoria de curto prazo do chat
         var memory = MessageWindowChatMemory.withMaxMessages(20);
