@@ -4,6 +4,7 @@ import com.tutor.config.ModelConfig;
 import com.tutor.prompt.PromptTemplates;
 import com.tutor.config.EmbeddingConfig;
 import com.tutor.rag.DocumentLoader;
+import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
 import dev.langchain4j.chain.ConversationalChain;
@@ -31,6 +32,9 @@ public class TutorApp {
 
         // Define a mémoria de curto prazo do chat
         var memory = MessageWindowChatMemory.withMaxMessages(20);
+
+        // Defini o perfil do aluno aqui
+        List<ChatMessage> mcp = PromptTemplates.getBeginnerMcp();
 
         // <<<<<< BLOCO DE TESTE DO DOCUMENTLOADER AQUI
 
@@ -65,7 +69,8 @@ public class TutorApp {
 
 
         // Define o prompt com o perfil do aluno (iniciante, intermediario, avançado)
-        memory.add(PromptTemplates.tutorPromptBeginner());
+        mcp.forEach(memory::add);
+        System.out.println("[SETUP] Master Control Prompt (MCP) para 'Intermediário' carregado na memória.");
 
         // Cria a cadeia de conversação com o modelo e a memória
         var chain = ConversationalChain.builder()
