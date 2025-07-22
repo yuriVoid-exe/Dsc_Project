@@ -1,0 +1,11 @@
+# Arquivos de Build do Maven
+target/
+
+# Arquivos de ambiente local (contendo segredos)
+.env
+
+# Arquivos de IDE (IntelliJ)
+.idea/
+
+# Armazenamento de dados gerados por serviços
+qdrant_storage/
