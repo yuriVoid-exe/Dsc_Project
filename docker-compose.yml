@@ -1,0 +1,14 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: tutor-llm-qdrant
+    ports:
+      # Mapeia a porta 6333 do seu PC (para Web UI) para a porta 6333 do contêiner (onde o HTTP está)
+      - "6333:6333"
+      # Mapeia a porta 6334 do seu PC (para Java/gRPC) para a porta 6334 do contêiner (onde o gRPC está)
+      - "6334:6334"
+    volumes:
+      - ./qdrant_storage:/qdrant/storage  # Persiste os dados na sua máquina local
+
+volumes:
+  qdrant_storage:
