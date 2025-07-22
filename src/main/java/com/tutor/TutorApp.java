@@ -1,101 +1,117 @@
 package com.tutor;
 
 import com.tutor.config.ModelConfig;
+import com.tutor.service.TutorAgent;
+import com.tutor.service.TutorTools;
+import com.tutor.service.RouterAgent;
 import com.tutor.prompt.PromptTemplates;
 import com.tutor.config.EmbeddingConfig;
-import com.tutor.rag.DocumentLoader;
+import com.tutor.rag.QueryTransformer;
+import com.tutor.rag.QdrantVectorStoreManager;
+import com.tutor.rag.RetrieverService;
 import dev.langchain4j.data.message.ChatMessage;
 import dev.langchain4j.data.segment.TextSegment;
 import dev.langchain4j.model.embedding.EmbeddingModel;
-import dev.langchain4j.chain.ConversationalChain;
+import dev.langchain4j.store.embedding.EmbeddingStore;
+import dev.langchain4j.chain.ConversationalRetrievalChain;
+import dev.langchain4j.retriever.Retriever;
 import dev.langchain4j.memory.chat.MessageWindowChatMemory;
 import dev.langchain4j.model.chat.ChatLanguageModel;
-
+import dev.langchain4j.model.input.PromptTemplate; // Import necessário
+import com.tutor.rag.TransformingRetriever;
+import dev.langchain4j.chain.ConversationalChain;
 import java.util.List;
 import java.util.Scanner;
 
- /**
- * Classe principal que inicializa o Tutor de Inglês.
- * Usa LangChain4j com modelo local via Ollama.
+/**
+ * Classe principal que inicializa e executa o Tutor de Inglês com RAG.
+ * A classe main orquestra a inicialização dos componentes e a construção
+ * da cadeia de conversação com recuperação de conhecimento.
  */
-
 public class TutorApp {
 
     public static void main(String[] args) {
-
-        // Recupera o modelo de linguagem configurado
+        // Carrega componentes Fundamentais (Modelo de LLM e modelo de Embedding).
+        System.out.println("[1/4] Carregando modelos de IA...");
         ChatLanguageModel model = ModelConfig.createChatLanguageModel();
+        EmbeddingModel embeddingModel = EmbeddingConfig.createEmbeddingModel();
+        System.out.println("      ... Modelos carregados com sucesso.");
 
-        // Instancia o modelo de embedding
-        EmbeddingModel embeddingModel = EmbeddingConfig.createEmbeddingModel(); // Inicializa e testa o modelo de embedding
-        System.out.println("[SETUP] Modelos de Chat e Embedding carregados com sucesso.");
+        System.out.println("[2/4] Conectando e preparando a base de conhecimento (Qdrant)...");
+        EmbeddingStore<TextSegment> embeddingStore = QdrantVectorStoreManager.getEmbeddingStore();
+        System.out.println("      ... Base de conhecimento pronta para uso.");
 
-        // Define a mémoria de curto prazo do chat
-        var memory = MessageWindowChatMemory.withMaxMessages(20);
+        // ====================================================================================
+        // ETAPA 2: CONSTRUIR OS PIPELINES ESPECIALIZADOS
+        // ====================================================================================
+        System.out.println("[2/4] Construindo pipelines especializados...");
 
-        // Defini o perfil do aluno aqui
+        // Usaremos uma única memória compartilhada para manter o contexto entre os pipelines.
+        MessageWindowChatMemory sharedMemory = MessageWindowChatMemory.withMaxMessages(20);
         List<ChatMessage> mcp = PromptTemplates.getBeginnerMcp();
+        mcp.forEach(sharedMemory::add);
 
-        // <<<<<< BLOCO DE TESTE DO DOCUMENTLOADER AQUI
-
-        System.out.println("\n--- [SETUP] Carregando a base de conhecimento (Documentos) ---");
-        List<TextSegment> segments = null; // Declaramos a lista aqui para uso futuro
-        try {
-            // O caminho para a pasta data a partir da raiz do projeto.
-            String dataDirectory = "data";
-            segments = DocumentLoader.loadAndSplitDocuments(dataDirectory);
-
-            if (segments != null && !segments.isEmpty()) {
-                System.out.println("[SETUP] Base de conhecimento carregada. Total de segmentos: " + segments.size());
-                System.out.println("--- Exemplo de Segmento ---");
-                TextSegment firstSegment = segments.get(0);
-                System.out.println("Origem: " + firstSegment.metadata().get("file_name"));
-                System.out.println("Conteúdo: \"" + firstSegment.text().substring(0, Math.min(100, firstSegment.text().length())) + "...\"");
-            } else {
-                System.out.println("[SETUP] WARN: Nenhuma base de conhecimento foi carregada.");
-            }
-
-        } catch (Exception e) {
-            System.err.println("[SETUP] ERRO CRÍTICO: Falha ao carregar a base de conhecimento. O sistema RAG não funcionará.");
-            e.printStackTrace();
-            // Em um cenário real, você poderia decidir encerrar a aplicação aqui se o RAG for essencial.
-        }
-        // <<<<<< FIM DO BLOCO DE TESTE
-
-        // ====================================================================================
-        // ETAPA DE CONFIGURAÇÃO DO CHAT INTERATIVO
-        // ====================================================================================
-        System.out.println("\n--- Configurando o assistente de conversação ---");
-
-
-        // Define o prompt com o perfil do aluno (iniciante, intermediario, avançado)
-        mcp.forEach(memory::add);
-        System.out.println("[SETUP] Master Control Prompt (MCP) para 'Intermediário' carregado na memória.");
-
-        // Cria a cadeia de conversação com o modelo e a memória
-        var chain = ConversationalChain.builder()
+        // 2.1. Pipeline de Conversa Simples (para saudações e bate-papo)
+        ConversationalChain conversationalChain = ConversationalChain.builder()
                 .chatLanguageModel(model)
-                .chatMemory(memory)
+                .chatMemory(sharedMemory)
                 .build();
+        System.out.println("      ... Pipeline de Conversa Simples pronto.");
 
-        // Mensagem inicial
-        System.out.println("Tutor de Inglês-para Brasileiros");
-        System.out.println("Digite 'sair' para encerrar.\n");
+        // 2.2. Pipeline de RAG (para perguntas que exigem conhecimento)
+        Retriever<TextSegment> baseRetriever = RetrieverService.createRetriever(embeddingStore, embeddingModel);
+        QueryTransformer queryTransformer = new QueryTransformer();
+        Retriever<TextSegment> transformingRetriever = new TransformingRetriever(baseRetriever, queryTransformer);
+        PromptTemplate ragPromptTemplate = PromptTemplates.getCompatibleRagSynthesisProtocolOptimized();
 
-        // Leitura do usuário
-        Scanner scanner = new Scanner(System.in);
-        while(true) {
-            System.out.println("Você: ");
-            String pergunta = scanner.nextLine();
+        ConversationalRetrievalChain ragChain = ConversationalRetrievalChain.builder()
+                .chatLanguageModel(model)
+                .chatMemory(sharedMemory)
+                .retriever(transformingRetriever)
+                .promptTemplate(ragPromptTemplate)
+                .build();
+        System.out.println("      ... Pipeline de RAG pronto.");
 
-            if (pergunta.equalsIgnoreCase("sair")) {
-                System.out.println("Até logo!");
-                break;
+        // ====================================================================================
+        // ETAPA 3: CONSTRUIR O ROTEADOR
+        // ====================================================================================
+        System.out.println("[3/4] Construindo o roteador de intenção...");
+        RouterAgent router = RouterAgent.create();
+        System.out.println("      ... Roteador pronto.");
+
+        System.out.println("[4/4] Inicialização concluída.");
+
+        // --- INÍCIO DA INTERAÇÃO ---
+        System.out.println("\n==================================================");
+        System.out.println("  Tutor de Inglês inicializado. Estou pronto!");
+        System.out.println("==================================================\n");
+
+        try (Scanner scanner = new Scanner(System.in)) {
+            while (true) {
+                System.out.print("Você: ");
+                String pergunta = scanner.nextLine();
+
+                if (pergunta.equalsIgnoreCase("sair")) {
+                    System.out.println("Até logo!");
+                    break;
+                }
+
+                // ETAPA DE ROTEAMENTO: O cérebro da decisão
+                String route = router.route(pergunta);
+                System.out.println("[ROUTER] Decisão: " + route);
+
+                System.out.print("Tutor: ");
+                String resposta;
+                if ("rag".equalsIgnoreCase(route.trim())) {
+                    // Usa o pipeline de RAG para perguntas complexas
+                    resposta = ragChain.execute(pergunta);
+                } else {
+                    // Usa o pipeline de conversa simples para todo o resto
+                    resposta = conversationalChain.execute(pergunta);
+                }
+
+                System.out.println(resposta + "\n");
             }
-
-            // Processa a entrada com LangChain4j + modelo
-            String resposta = chain.execute(pergunta);
-            System.out.println("Tutor: " + resposta + "\n");
         }
     }
 }
